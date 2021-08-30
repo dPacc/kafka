@@ -86,3 +86,48 @@ Now inside the `/tmp/kafka-logs/` folder you will find **3 animals folder**, one
 - **Consumer** from **specific offset** from **all partitions**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic animals --offset 1` - This will throw an error as **partition is required while specifying offset**. Remember, it is **not possible to read from a specific offset across the entire topic partitions**.
   
 - Topic **details**: `bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic animals`
+
+## Cluster with Multiple Brokers
+
+Now that we understand the basics, let us now **run 3 different brokers** on the same machine. Start by deleting the `/tmp/kafka-logs` and `/tmp/zookeeper` folders.
+
+**NOTE**: To run 3 different broker, you would need to create 3 different `server.properties` file with **unique port**, **broker ID** and **log directory**.
+
+- In the `kafka/config` folder, create `server0.properties, server1.properties and server2.properties`
+
+- Modify the **broker. id**, uncomment the **listeners://:909X** and change the **log.dirs=/tmp/kafka-logs-x**
+
+- Start **Zookeeper**: `bin/zookeeper-server-start.sh config/zookeeper.properties`
+
+- Start **3 different brokers**:
+`bin/kafka-server-start.sh config/server0.properties`
+`bin/kafka-server-start.sh config/server1.properties`
+`bin/kafka-server-start.sh config/server2.properties`
+
+How do we verify which brokers are active in the cluster? We can use **Zookeeper to get cluster info (active brokers)**.
+
+- Get info from Zookeeper about **active broker IDs**: `bin/zookeeper-shell.sh localhost:2181 ls /brokers/ids`
+
+- Get info from Zookeeper about **specific broker by ID**: `bin/zookeeper-shell.sh localhost:2181 get /brokers/ids/ID_NUMBER`
+
+Let us now create a **topic** with **replication factor 1** and **partition count 5**.
+
+- **Create** topic: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --create --replication-factor 1 --partitions 5 --topic cars`
+
+The **5 partitions will be randomly created on each of the brokers**. To understand better, explore the `/tmp/kafka-logs-x` folder.
+
+Let us now start **producing** to the topic
+
+- **Produce** to topic: `bin/kafka-console-producer.sh --broker-list localhost:9092,localhost:9093,localhost:9094 --topic cars`
+
+- **Consume** the topic: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --topic cars`
+
+- **List** topics: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --list`
+
+- **Topic details**: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --describe --topic cars`
+
+- **Consume from beginning**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --topic cars --from-beginning`
+
+Now let us **simulate a broker failure** by shutting down one of the brokers. If you **restart the consumer** now, you will notice a warning message saying that **all the messages could not be read as the partitions in the broker was not available**.
+
+If you list the **Topic details**, you will notice that 2 leaders are none. Then, if you restart the broker, everything will be back to normal. To avoid this, we should use a **replication factor of more than 1**.

@@ -38,11 +38,11 @@ Producers **send messages** to the Kafka cluster. Consumers **receive messages**
 
 We can use any producer to send messages to the Topic. But let us use the producer that is shipped with the Kafka installation located in `/bin/kafka-console-producer.sh`
 
-- **Produce** to a topic: `in/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic TOPIC_NAME`
+- **Produce** to a topic: `bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic TOPIC_NAME`
 
 Once the above command is run, it will take you to the **console**, where you can enter the messages.
 
-- **Consume** a topic/s: `in/kafka-console-consumer.sh --bootstrap-server localhost:9092 --WHITE_LIST/TOPIC TOPIC_NAME`
+- **Consume** a topic/s: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --WHITE_LIST/TOPIC TOPIC_NAME`
 
 **NOTE**: WHITE_LIST is for connecting to a set of topics and read from **multiple topics** using wildcard syntax. TOPIC is for reading message from a **single topic**.
 
@@ -64,3 +64,25 @@ If you open the `/config/server.properties` file you will notice the `log.dirs=/
 The **default** log retention period is **7 days (168 hours)**
 
 **What are offsets in a topic?** Every **message** inside a topic has a **unique number** called offset. **First message in each topic has an offset 0**. Consumers start reading messages starting from specific offset.
+
+## Topic with Multiple Partitions
+
+Delete the `/tmp/kafka-logs` folder and restart the Zookeeper and Kafka servers.
+
+- **Create** a topic with **3 partitions** of name **animals**: `bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --replication-factor 1 --partitions 3 --topic animals`
+
+Now inside the `/tmp/kafka-logs/` folder you will find **3 animals folder**, one for each partition.
+
+- Start the **producer**: `bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic animals` an produce a few messages
+
+- Start the **consumer**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic animals --from-beginning`
+
+**IMPORTANT**: If you notice, the **messages in the consumer are in a different order**. This is because we have created a **topic with several partitions** and every consumers that connects to the topic will have to read from multiple partitions, it won't read in any round-robin fashion. It **can read in a different order**. A thing to keep in mind is that **consumers may not always read messages in the same order that they were produced**.
+
+- **Consumer** from a **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --partition 1 --topic animals --from-beginning`
+
+- **Consumer** from **specific offset** from **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --partition 2 --topic animals --offset 0`
+
+- **Consumer** from **specific offset** from **all partitions**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic animals --offset 1` - This will throw an error as **partition is required while specifying offset**. Remember, it is **not possible to read from a specific offset across the entire topic partitions**.
+  
+- Topic **details**: `bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic animals`

@@ -79,11 +79,11 @@ Now inside the `/tmp/kafka-logs/` folder you will find **3 animals folder**, one
 
 **IMPORTANT**: If you notice, the **messages in the consumer are in a different order**. This is because we have created a **topic with several partitions** and every consumers that connects to the topic will have to read from multiple partitions, it won't read in any round-robin fashion. It **can read in a different order**. A thing to keep in mind is that **consumers may not always read messages in the same order that they were produced**.
 
-- **Consumer** from a **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --partition 1 --topic animals --from-beginning`
+- **Consume** from a **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --partition 1 --topic animals --from-beginning`
 
-- **Consumer** from **specific offset** from **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --partition 2 --topic animals --offset 0`
+- **Consume** from **specific offset** from **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --partition 2 --topic animals --offset 0`
 
-- **Consumer** from **specific offset** from **all partitions**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic animals --offset 1` - This will throw an error as **partition is required while specifying offset**. Remember, it is **not possible to read from a specific offset across the entire topic partitions**.
+- **Consume** from **specific offset** from **all partitions**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic animals --offset 1` - This will throw an error as **partition is required while specifying offset**. Remember, it is **not possible to read from a specific offset across the entire topic partitions**.
   
 - Topic **details**: `bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic animals`
 
@@ -112,7 +112,7 @@ How do we verify which brokers are active in the cluster? We can use **Zookeeper
 
 Let us now create a **topic** with **replication factor 1** and **partition count 5**.
 
-- **Create** topic: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --create --replication-factor 1 --partitions 5 --topic cars`
+- **Create topic**: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --create --replication-factor 1 --partitions 5 --topic cars`
 
 The **5 partitions will be randomly created on each of the brokers**. To understand better, explore the `/tmp/kafka-logs-x` folder.
 
@@ -131,3 +131,59 @@ Let us now start **producing** to the topic
 Now let us **simulate a broker failure** by shutting down one of the brokers. If you **restart the consumer** now, you will notice a warning message saying that **all the messages could not be read as the partitions in the broker was not available**.
 
 If you list the **Topic details**, you will notice that 2 leaders are none. Then, if you restart the broker, everything will be back to normal. To avoid this, we should use a **replication factor of more than 1**.
+
+## Cluster with Multiple Brokers and Topic with Replication
+
+We will use the same example as above, but this time with **replication**. First, delete the `/tmp/kafka-logs-x` and `/tmp/zookeeper` folders.
+
+- Start **Zookeeper**: `bin/zookeeper-server-start.sh config/zookeeper.properties`
+
+- Start **3 different brokers**:
+`bin/kafka-server-start.sh config/server0.properties`
+`bin/kafka-server-start.sh config/server1.properties`
+`bin/kafka-server-start.sh config/server2.properties`
+
+- Get info from Zookeeper about **active broker IDs**: `bin/zookeeper-shell.sh localhost:2181 ls /brokers/ids`
+
+- **Create topic with replication 3**: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --create --replication-factor 3 --partitions 7 --topic months`
+
+**IMPORTANT**: Even in production env it is **not necessary** to go with a **replication factor beyond 3**. Total quantity of partitions in the topic will be = (**partition** x **replication**) = (7 x 3) = **21**. Therefore, atleast **7 partitions will be created in each broker**.
+
+**NOTE**: If there are replicas then **one of the brokers is the leader for a specific partition and all the remaining brokers are followers**. They simply accept write request from the leader and they don't share producers and consumers for particular partitions where they are leaders.
+
+![LeaderFollower](leaderFollower.png)
+
+- **List** topics: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --list`
+
+Once you list topics, **__consumer_offsets** topic is missing here, why? **Because we haven't consumed any messages at this point**.
+
+- **Topic details**: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --describe --topic months`
+
+From the above topic details command, you can see the **leader broker for each partition**.
+
+Let us now start **producing** to the topic
+
+- **Produce** to topic: `bin/kafka-console-producer.sh --broker-list localhost:9092,localhost:9093,localhost:9094 --topic months`
+
+- **Consume** the topic: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --topic months --from-beginning`
+
+- **Consume** from a **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --partition 3 --topic months --from-beginning`
+
+- **Consume** from **specific offset** from **specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --partition 3 --topic months --offset 1`
+
+**NOTE**: In the `/tmp/kafka-logs-x/` folders, observe how the messages are store. As every broker has all the 7 partitions, the **same messages will be present across the brokers in a particular partition** due to the replication factor = number of brokers.
+
+Now let us **simulate a broker failure** by shutting down  the **broker with ID 1** and see how the consumers and producers react.
+
+**IMPORTANT**: If you check the **topic details**, you will notice that **a new leader has been elected in place of broker with ID 1**.
+Also notice the **In Sync Replicas (Isr)**, it is one broker short.
+
+- Now **re-run the consumer** and **all the messages will still show up**.
+
+What would happen if **another broker is brought down**? Let's bring down broker with ID 0 and see what happens.
+
+If you produce messages after bringing it down, you will notice that the **consumer still consumes the messages**. Check the **topic details**, there will be another leader re-election with only one Isr left.
+
+#### What would happen if you revive back both the dead brokers?
+
+After a minute **there will be a re-election of a new leader**, and the **Isr has changed**.

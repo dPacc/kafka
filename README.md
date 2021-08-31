@@ -237,3 +237,43 @@ Let us now try starting **another consumer in the same consumer group**.
 **REMEMBER:** Each message is consumed only once by either of the consumers. Once a consumer receives a message, the **same message cannot be consumed by another consumer in the same consumer group**.
 
 What would happen is the **number of consumers in the consumer group** is **more than the number of partitions?** The **extra consumers will remain idle** and those will start consuming if any of the active consumer stops.
+
+## Kafka Performance Testing
+
+In this section, let us start a Kafka cluster with multiple brokers. Test the performance of the producer and consumer.
+
+There is a built in utility to test the performance. With this utility, we will be able to produce multiple messages to out cluster at specific rates. We will be able to observe how fast the cluster would be able to write those messages and consumers would read the same.
+
+- Start **Zookeeper**: `bin/zookeeper-server-start.sh config/zookeeper.properties`
+
+- Start **3 different brokers**:
+`bin/kafka-server-start.sh config/server0.properties`
+`bin/kafka-server-start.sh config/server1.properties`
+`bin/kafka-server-start.sh config/server2.properties`
+
+- **Create topic with replication-3 partitions-100**: `bin/kafka-topics.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --create --replication-factor 3 --partitions 100 --topic perf`
+
+- **Consume** the topic: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092,localhost:9093,localhost:9094 --topic perf`
+
+Now, let's try to test our cluster by producing multiple messages with the built-in utility.
+
+- **Producer Performance Test 1**: `bin/kafka-producer-perf-test.sh --topic perf --num-records 1000 --throughput 100 --record-size 1000 --producer-props bootstrap.servers=localhost:9092`
+
+![test1](perfTest1.png)
+
+**--num-records**: How many messages in total will be produced.
+**--throughput**: How many messages producer per second.
+**--record-size**: Size of every message in bytes.
+**--producer-props**: Requires a list of key-value pairs, mandatory key is bootstrap.servers that should point to one of the servers in the kafka cluster.
+
+- **Producer Performance Test 2**: `bin/kafka-producer-perf-test.sh --topic perf --num-records 10000 --throughput 1000 --record-size 1000 --producer-props bootstrap.servers=localhost:9092`
+
+![test2](perfTest2.png)
+
+- **Producer Performance Test 3**: `bin/kafka-producer-perf-test.sh --topic perf --num-records 100000 --throughput 10000 --record-size 1000 --producer-props bootstrap.servers=localhost:9092`
+
+![test3](perfTest3.png)
+
+- **Producer Performance Test 4**: `bin/kafka-producer-perf-test.sh --topic perf --num-records 1000000 --throughput 100000 --record-size 1000 --producer-props bootstrap.servers=localhost:9092`
+
+![test4](perfTest4.png)

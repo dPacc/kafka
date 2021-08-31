@@ -277,3 +277,11 @@ Now, let's try to test our cluster by producing multiple messages with the built
 - **Producer Performance Test 4**: `bin/kafka-producer-perf-test.sh --topic perf --num-records 1000000 --throughput 100000 --record-size 1000 --producer-props bootstrap.servers=localhost:9092`
 
 ![test4](perfTest4.png)
+
+Let us now test the performance of consumer.
+
+- **Consumer Performance Test 1**: `bin/kafka-consumer-perf-test.sh --topic perf --broker-list localhost:9092 --messages 10000`
+
+- **Consumer Performance Test 2**: `bin/kafka-consumer-perf-test.sh --topic perf --broker-list localhost:9092 --messages 100000`
+
+- **Consumer Performance Test 3**: `bin/kafka-consumer-perf-test.sh --topic perf --broker-list localhost:9092 --messages 1000000`

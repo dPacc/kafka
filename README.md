@@ -187,3 +187,53 @@ If you produce messages after bringing it down, you will notice that the **consu
 #### What would happen if you revive back both the dead brokers?
 
 After a minute **there will be a re-election of a new leader**, and the **Isr has changed**.
+
+## Kafka Consumer Groups
+
+- Start **Zookeeper**: `bin/zookeeper-server-start.sh config/zookeeper.properties`
+
+- Start **Kafka brokers**: `bin/kafka-server-start.sh config/server.properties`
+
+- **Create a topic**: `bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --replication-factor 1 --partitions 5 --topic numbers`
+
+- **List** topics: `bin/kafka-topics.sh --bootstrap-server localhost:9092 --list`
+
+- **Produce** to topic: `bin/kafka-console-producer.sh --broker-list localhost:9092 --topic numbers`
+
+- **Consume** the topic: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic numbers`
+
+- **List Consumer Groups**: `bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list`
+
+Now create another consumer, then **list the consumer groups**, you will notice that there will be **2 consumer groups**. The purpose of creating consumer groups in kafka is to reduce the load on the consumers.
+
+#### Why do we need consumer groups?
+
+Let's imagine that there is some topic with multiple producers who send messages to it at very high rates (1000s msgs/sec). A single consumer may not be able to consume all the produced messages at the same high rates. That's why consumers may be organized into **consumer groups to share consumption of messages**
+
+- **Consumer group details**: `bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --group CONSUMER_GRP_NUM --describe`
+
+**NOTE:** For every consumer, a **consumer group will be created automatically**.
+
+- **Consumer with specific consumer group**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic numbers --group numbers-group --from-beginning`
+
+After creating this consumer with a custom group. List the details of this group
+
+- **Specific consumer group details**: `bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --group numbers-group --describe`
+
+Here, you will notice the number of partitions in that consumer and also the **number of messages stored** in each partition denoted by **current offset**.
+
+Now, start another consumer and read from a specific partition
+
+- **Consume from a specific partition**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --partition 3 --topic numbers --from-beginning`
+
+**NOTE:** If you notice the details of the consumer group, you will see that all the partitions have the **same ID**, this is because we have just **one consumer in the consumer group**.
+
+Let us now try starting **another consumer in the same consumer group**.
+
+- **Second Consumer in the same consumer group**: `bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic numbers --group numbers-group --from-beginning`
+
+**IMPORTANT:** If you notice the output of the **second consumer in the same consumer group**, **there aren't any messages consumed** even after adding the --from-beginning flag. Now, if you see the **details of the consumer group**, the consumer ID would be different, i.e the **partitions would be split equally between both the consumers**.
+
+**REMEMBER:** Each message is consumed only once by either of the consumers. Once a consumer receives a message, the **same message cannot be consumed by another consumer in the same consumer group**.
+
+What would happen is the **number of consumers in the consumer group** is **more than the number of partitions?** The **extra consumers will remain idle** and those will start consuming if any of the active consumer stops.
